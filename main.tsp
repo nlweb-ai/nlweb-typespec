@@ -29,6 +29,23 @@ model AskRequest {
     response_format?: string;
 }
 
+/** 
+ * Request for NLWeb Who 'Agent Finder' endpoint for agent discovery.
+ * 
+ * The Who endpoint helps discovery which agents/tools can answer a given question, allowing for agent selection before making an Ask request.
+ */
+model WhoRequest {
+    /** Natural language query for agent discovery (required) */
+    query: string;
+
+    /** Enable streaming response */
+    streaming?: boolean;
+
+    /** Additional Constraints (filters, capabilities, etc.) */
+    constr?: Record<unknown>;
+}
+
+
 /** Metadata for NLWeb response format */
 
 model ResponseMeta {
@@ -69,6 +86,16 @@ model Resource {
     data: Record<unknown> | Record<unknown>[];
 }
 
+/** Agent/tool description returned by Who endpoint */
+model Agent {
+    /** Type of agent (e.g., "Search Agent" or "Analytics Agent") */
+    @encodedName("application/json", "@type")
+    type_: string;
+
+    /** Agent specification - structure will depend on agent type */
+    agentSpec: Record<unknown>;
+}
+
 /** Resource content item with structured data */
 model ResourceContent {
     /** must be "resource" */
@@ -93,6 +120,24 @@ model AskResponse {
      * - May contain multiple items of each type in any order
      * 
      * Note:  The requirement for at least one TextContent item must be validated by implementations, as this constraint cannot be expressed in the type system.
+     */
+    @minItems(1)
+    content: (TextContent | ResourceContent)[];
+}
+
+/** NLWeb Who Response */
+model WhoResponse {
+    /** Metadata about the response */
+    @encodedName("application/json", "_meta")
+    meta: ResponseMeta;
+
+    /** 
+     * Array of content items containing agent descriptions.
+     * 
+     * Constraints:
+     * - Must contain at least one item
+     * - Typically contains ResourceContent with Agent data
+     * - May include TextContent for descriptions
      */
     @minItems(1)
     content: (TextContent | ResourceContent)[];
