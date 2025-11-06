@@ -9,7 +9,7 @@ import sys
 
 def load_typespec_schemas():
     '''load schemas from the TypeSpec generated OpenAPI'''
-    openapi_path = Path(__file__).parent.parent / "tsp-ouput/openapi/openapi.yaml"
+    openapi_path = Path(__file__).parent.parent / "tsp-output/openapi/openapi.yaml"
 
     if not openapi_path.exists():
         print("ERROR: OpenAPI schema not found. Run 'npx tsp compile .' first")
@@ -27,7 +27,7 @@ def load_pydantic_schemas():
     This assumes that nlweb_core is installed or available in the path
     '''
     try:
-        from nlweb_core import models
+        from nlweb_core.protocol import models
     except ImportError:
         print("ERROR: nlweb_core not found.  Install it first.")
         print("     pip install git+https://github.com/nlweb-ai/nlweb_core.git")
@@ -45,15 +45,15 @@ def load_pydantic_schemas():
         else:
             print(f" {model_name} not found in nlweb_core")
 
-        return schemas
+    return schemas
 
-def compare_required_fields(typespec_schema, pydantic_schema_ model_name):
+def compare_required_fields(typespec_schema, pydantic_schema, model_name):
     '''check that required fields match'''
     ts_required = set(typespec_schema.get('required', []))
     py_required = set(pydantic_schema.get('required', []))
 
     #handle _meta vs meta naming
-    if '_meta' is ts_required and 'meta' in py_required:
+    if '_meta' in ts_required and 'meta' in py_required:
         py_required.remove('meta')
         py_required.add('_meta')
 
@@ -71,7 +71,7 @@ def compare_properties(typespec_schema, pydantic_schema, model_name):
     py_props = set(pydantic_schema.get('properties', {}).keys())
 
     #handle _meta vs meta naming
-    if '_meta' is ts_props and 'meta' in py_props:
+    if '_meta' in ts_props and 'meta' in py_props:
         py_props.remove('meta')
         py_props.add('_meta')
 
@@ -88,12 +88,29 @@ def compare_properties(typespec_schema, pydantic_schema, model_name):
         print(f" {model_name}: Properties in Pydantic but not in TypeSpec: {missing_in_typespec}")
         issues = True
 
+    if not issues:
+        print(f" {model_name}: All properties present in both")
+    
+    return not issues
+
+def validate_model(model_name, typespec_schemas, pydantic_schemas):
+    """Validate a single model"""
+    print(f" Validating {model_name}...")
+    
+    if model_name not in typespec_schemas:
+        print(f" {model_name} not found in TypeSpec schemas")
+        return None  # Neither pass nor fail - just not applicable
+    
+    if model_name not in pydantic_schemas:
+        print(f" {model_name} not yet implemented in nlweb_core - skipping")
+        return None  # Not implemented yet - not a failure
+    
     ts_schema = typespec_schemas[model_name]
     py_schema = pydantic_schemas[model_name]
-
+    
     required_match = compare_required_fields(ts_schema, py_schema, model_name)
     props_match = compare_properties(ts_schema, py_schema, model_name)
-
+    
     return required_match and props_match
 
 def main():
@@ -103,6 +120,9 @@ def main():
     print("=" * 60)
 
     #Load schemas
+    typespec_schemas = load_typespec_schemas()
+    pydantic_schemas = load_pydantic_schemas()
+
     print(f" TypeSpec models: {len(typespec_schemas)}")
     print(f" Pydantic models: {len(pydantic_schemas)}")
 
