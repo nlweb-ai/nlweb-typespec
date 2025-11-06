@@ -9,7 +9,6 @@
     "@typespec/http-client-csharp": "latest",
     "@typespec/http-client-java": "latest",
     "@typespec/http-client-js": "latest",
-    "@typespec/http-client-python": "latest",
     "@typespec/http-server-csharp": "latest",
     "@typespec/http-server-js": "latest",
     "@typespec/openapi": "latest",
@@ -18,6 +17,7 @@
   },
   "packageManager": "npm@11.6.2+sha512.ee22b335fcbc95662cdf3ab8a053daf045d9cf9c6df6040d28965abb707512b2c16fa6c5eec049d34c74f78f390cebd14f697919eadb97756564d4f9eccc4954",
   "devDependencies": {
+    "@typespec/http-client-python": "^0.20.2",
     "@typespec/json-schema": "^1.5.0"
   }
 }
