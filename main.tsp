@@ -1,32 +1,88 @@
 import "@typespec/http";
 import "@typespec/json-schema";
 
+using TypeSpec.JsonSchema; 
+
 @service(#{
     title: "NLWeb Protocol",
 })
 namespace NLWeb;
 
-model AskRequest {
-    /** natural language query (required) */
-    query: string;
+model Query {
+    /** Natural language query from user.  (required) */
+    text: string;
 
-    /** Previous conversational context.  Should be provided in comma separated list. We would like Ask requests to be restful. Passing the previous queries enables continued conversations without the server keeping state indefinitely. */
+    /** Website or domain to search. May include one or many. (optional) */
+    site?: string[];
+
+    /** Geographic constraint of query (optional) */
+    location?: string;
+
+    /** price range or constraint (optional) */
+    price?: string;
+
+    /** Type of item requested (e.g., movie, recipe, customer, etc.) */
+    type?: string;
+
+    /** Allow additional domain-specific filters using schema.org vocabulary or comparable schema */
+    ...Record<unknown>;
+
+}
+
+model Context {
+    /** Array of previous queries in the conversation.  (optional) */
     prev?: string[];
 
-    /** additional context (e.g., from memory) */
-    context?: string;
+    /** Free-form text paragraph describing the broader context (optional) */
+    text?: string;
 
-    /** Mode of response.  Currently available modes are to return a list of matching items, or to provide a summary answer. */
-    mode?: "list" | "summary";
+    /** Persistent information about the user's preferences, constraints, or characteristics */
+    memory?: string[];
 
-    /** Site:  An endpoint may provide the Ask interface for multiple sites.  Use this to specify which site(s) to include responses from. */
-    site?: string;
+}
 
-    /** Streaming:  Indicates whether the results should be streamed back. */
-    streaming?: boolean;
+model Return_Response {   
+    /** Boolean indicating whether streaming response is desired. Defaults to true. (true or false) */
+    streaming?: boolean = true;
 
-    /** Response format:  Optional field for future use. */
-    response_format?: string;
+    /** Response format specification, e.g., chatgpt_app, etc. (optional) */
+    format?: string; 
+
+    /** Response mode such as list, summarize, etc. (optional) */
+    mode?: string;
+
+    /** Language code (e.g., en, fr, es) for the response. (optional) */
+    lang?: string;
+
+    /** Type of client making the request, for example, mobile, desktop, etc. (optional) */
+    client_type?: "mobile" | "desktop" | "tablet" | "web";
+
+}
+
+model Meta {
+    /** Identifier for tracking the conversation across multiple queries. (optional) */
+    conversation_id?: string;
+
+    /** API version number being used (optional) */
+    api_version?: string;
+
+    /** Request ID to check status of a previous Promise response. Only used when polling for async results. (optional) */
+    request_id?: string;
+
+}
+
+model AskRequest {
+    /** Specifies the user's current request and associated query parameters in natural language. (required) */
+    query: Query;
+
+    /** Provides contextual information about the query to help the agent better understand and respond to the request.  Context can be communicated in multiple ways depending on what information is available and relevant. (optional) */
+    context?: Context;
+
+    /** Specifies expectations and requirements for how the return response should be formatted and delivered. (optional) */
+    return_response?: Return_Response;
+
+    /** Contains metadata about the request itself, including requested version number of the protocol and tracking information. */
+    meta?: Meta;
 }
 
 /** 
@@ -38,61 +94,85 @@ model WhoRequest {
     /** Natural language query for agent discovery (required) */
     query: string;
 
-    /** Enable streaming response */
-    streaming?: boolean;
+    /** Enable streaming response.  Defaults to true. (optional) */
+    streaming?: boolean = true;
 
+    /** Conversational identifier - pass-through only when there are simultaneous conversations to track (optional) */
+    conversation_id?: string;
+    
     /** Additional Constraints (filters, capabilities, etc.) */
     constr?: Record<unknown>;
 }
 
 
-/** Metadata for NLWeb response format */
+/** Metadata for NLWeb 'Ask' response format */
 
-model ResponseMeta {
-    /** conversational identifier - pass-through only when there are simultaneous conversations to track */
+model AskResponseMeta {
+    /** Conversational identifier - pass-through only when there are simultaneous conversations to track (optional) */
     conversation_id?: string;
 
-    /** protocol version */
-    version: string;
+    /** Describes the type of response being sent.  Answer responds to the user query.  Elicitation allows the server to request additional information to carry out the task, and Promise allows for async task status checks. (optional) */
+    response_type?: "Answer" | "Elicitation" | "Promise";
 
-    /** Allow any additional protocol-specific fields */
+    /** Request ID for tracking asynchronous responses (optional) */
+    request_id?: string;    
+
+    /** protocol version (optional) */
+    version?: string;
+
+    /** Allow any additional protocol-specific fields (optional) */
     ...Record<unknown>;
 }
 
-/** Natural language text content item  */
+/** Metadata for NLWeb 'Who' response format */
+
+model WhoResponseMeta {
+    /** conversational identifier - pass-through only when there are simultaneous conversations to track (optional) */
+    conversation_id?: string;
+
+    /** protocol version (optional) */
+    version?: string;
+
+    /** Allow any additional protocol-specific fields (optional) */
+    ...Record<unknown>;
+}
+
+
+/** Natural language text content item (requires at least one)  */
 model TextContent {
-    /** Must be "text" */
+    /** Must be "text" (required) */
     type: "text";
 
-    /** Natural language content */
+    /** Natural language content (required) */
     text: string;
 }
 
 /** Container for resource data with optional UI rendering info */
 model Resource {
-    /** Resource identifier/template reference (e.g., ui://widget/restaurant-card.html) */
+    /** Resource identifier/template reference, e.g., ui://widget/restaurant-card.html (optional) */
     uri?: string;
 
-    /** MIME type (e.g., text/html+skybridge for ChatGPT Apps) */
+    /** MIME type, e.g., text/html+skybridge for ChatGPT Apps. (optional) */
     mimeType?: string;
 
-    /** Raw content, typically HTML for widget rendering */
+    /** Raw content, typically HTML for widget rendering (optional) */
     text?: string;
 
     /**
      * Structured data payload.
-     * Can be a single object or an array of objects (potentially of different types)
+     * Can be a single object or an array of objects, potentially of different types.
+     * (required)
      */
     data: Record<unknown> | Record<unknown>[];
 }
 
 /** Agent/tool description returned by Who endpoint */
 model Agent {
-    /** Type of agent (e.g., "Search Agent" or "Analytics Agent") */
+    /** Type of agent, e.g., "Search Agent" or "Analytics Agent". (required) */
     @encodedName("application/json", "@type")
     type_: string;
 
-    /** Agent specification - structure will depend on agent type */
+    /** Agent specification - structure will depend on agent type (required) */
     agentSpec: Record<unknown>;
 }
 
@@ -109,7 +189,7 @@ model ResourceContent {
 model AskResponse {
     /** Metadata about the response */
     @encodedName("application/json", "_meta")
-    meta: ResponseMeta;
+    meta: AskResponseMeta;
 
     /**
      * Array of content items (text and/or resource).
@@ -129,7 +209,7 @@ model AskResponse {
 model WhoResponse {
     /** Metadata about the response */
     @encodedName("application/json", "_meta")
-    meta: ResponseMeta;
+    meta: WhoResponseMeta;
 
     /** 
      * Array of content items containing agent descriptions.

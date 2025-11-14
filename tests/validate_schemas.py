@@ -93,6 +93,51 @@ def compare_properties(typespec_schema, pydantic_schema, model_name):
     
     return not issues
 
+def compare_property_types(typespec_schema, pydantic_schema, model_name, schemas_dict):
+    '''Check that property types match, including nested structures'''
+    ts_props = typespec_schema.get('properties', {})
+    py_props = pydantic_schema.get('properties', {})
+    
+    issues = []
+    
+    for prop_name in ts_props.keys():
+        if prop_name not in py_props:
+            continue  # Already caught by compare_properties
+        
+        ts_prop = ts_props[prop_name]
+        py_prop = py_props[prop_name]
+        
+        # Check if one is a reference to another schema
+        def has_ref(prop):
+            """Check if a property references another schema"""
+            # Direct $ref
+            if prop.get('$ref'):
+                return True
+            # Inside allOf
+            if prop.get('allOf'):
+                return any(item.get('$ref') for item in prop.get('allOf', []))
+            # Inside anyOf (check for $ref in any item that's not null)
+            if prop.get('anyOf'):
+                return any(
+                    item.get('$ref') 
+                    for item in prop.get('anyOf', []) 
+                    if item.get('type') != 'null'
+                )
+            return False
+        
+        ts_has_ref = has_ref(ts_prop)
+        py_has_ref = has_ref(py_prop)
+        
+    if issues:
+        print(f" {model_name}: Type mismatches found:")
+        for issue in issues:
+            print(issue)
+        return False
+    
+    print(f" {model_name}: All property types match")
+    return True
+
+
 def validate_model(model_name, typespec_schemas, pydantic_schemas):
     """Validate a single model"""
     print(f" Validating {model_name}...")
@@ -110,8 +155,9 @@ def validate_model(model_name, typespec_schemas, pydantic_schemas):
     
     required_match = compare_required_fields(ts_schema, py_schema, model_name)
     props_match = compare_properties(ts_schema, py_schema, model_name)
-    
-    return required_match and props_match
+    types_match = compare_property_types(ts_schema, py_schema, model_name, typespec_schemas)
+
+    return required_match and props_match and types_match
 
 def main():
     print("=" * 60)
